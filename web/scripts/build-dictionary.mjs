@@ -11,6 +11,10 @@
  * not "calls", "woman" but not "women", and rejected 3.7% of ordinary words
  * while accepting 1934 curiosities like "aalii".
  *
+ * The package filters "common bad words" out of its upstream list, so a guess
+ * like "boobs" would be rejected. dictionary_extra.txt, hand-reviewed, puts
+ * those back (minus slurs); this script leaves it alone.
+ *
  * Run with: pnpm dictionary
  */
 import { readFile, writeFile } from "node:fs/promises";

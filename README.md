@@ -32,7 +32,7 @@ Every word you solve stays with you.
 ## The words
 
 <!-- bank-stats:start -->
-**4,963 answers** to play, and **34,942 words** accepted as guesses.
+**4,963 answers** to play, and **35,084 words** accepted as guesses.
 
 | Difficulty | 5 letters | 6 letters |
 | --- | ---: | ---: |

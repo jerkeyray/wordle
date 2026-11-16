@@ -15,9 +15,11 @@ import (
 //go:embed dictionary.txt
 var dictionaryRaw string
 
-// dictionaryExtra is a small uncensored supplement while the broad-source
-// import is reviewed. Guess acceptance is intentionally separate from which
-// words the game can serve as answers.
+// dictionaryExtra puts back real words the corpus package strips out: the
+// vulgar, sexual and anatomical words its upstream list (atebits/Words) has,
+// plus recent slang neither carries. Words used chiefly as slurs stay out.
+// Guess acceptance is intentionally separate from which words the game can
+// serve as answers, so nothing here is ever dealt.
 //
 //go:embed dictionary_extra.txt
 var dictionaryExtra string
