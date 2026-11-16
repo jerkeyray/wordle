@@ -197,7 +197,7 @@ type createRunRequest struct {
 
 func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 	if userID, signedIn := auth.UserID(r.Context()); signedIn && s.players != nil {
-		if _, err := s.players.Ensure(r.Context(), userID); err != nil {
+		if _, err := s.players.PlayerID(r.Context(), userID); err != nil {
 			s.log.Error("resolving player before run creation", "err", err)
 			writeError(w, http.StatusInternalServerError, "identity_unavailable", "could not start the run")
 			return
@@ -303,13 +303,13 @@ func (s *Server) handleCreateRun(w http.ResponseWriter, r *http.Request) {
 // Classic game never repeats one across devices. A failed
 // lookup risks a repeat rather than refusing a game.
 func (s *Server) excludePlayedWords(r *http.Request, exclude map[string]struct{}) {
-	p, ok := s.player(r)
+	id, ok := s.playerID(r)
 	if !ok {
 		return
 	}
-	played, err := s.players.PlayedWords(r.Context(), p.ID)
+	played, err := s.players.PlayedWords(r.Context(), id)
 	if err != nil {
-		s.log.Error("reading played words", "player", p.ID, "err", err)
+		s.log.Error("reading played words", "player", id, "err", err)
 		return
 	}
 	for _, w := range played {
@@ -444,15 +444,15 @@ func (s *Server) handleGuess(w http.ResponseWriter, r *http.Request) {
 	if atomic, ok := s.rounds.(interface {
 		UpdateRoundAndRun(context.Context, string, func(*game.Round, *game.Run, pgx.Tx) error) (*game.Round, *game.Run, error)
 	}); ok {
-		var player *players.Player
+		var playerID string
 		if userID, signedIn := auth.UserID(r.Context()); signedIn && s.players != nil {
-			p, err := s.players.Ensure(r.Context(), userID)
+			id, err := s.players.PlayerID(r.Context(), userID)
 			if err != nil {
 				s.log.Error("resolving player before guess", "err", err)
 				writeError(w, http.StatusInternalServerError, "identity_unavailable", "could not save this move")
 				return
 			}
-			player = &p
+			playerID = id
 		}
 		round, run, err := atomic.UpdateRoundAndRun(r.Context(), chi.URLParam(r, "id"), func(round *game.Round, run *game.Run, tx pgx.Tx) error {
 			if round.RequestIDs[req.RequestID] {
@@ -474,8 +474,8 @@ func (s *Server) handleGuess(w http.ResponseWriter, r *http.Request) {
 					round.RequestFingerprints[req.RequestID] = fingerprint
 				}
 			}
-			if round.State != game.StatePlaying && player != nil {
-				if err := s.players.RecordSolveTx(r.Context(), tx, player.ID, s.solveRecord(r, round)); err != nil {
+			if round.State != game.StatePlaying && playerID != "" {
+				if err := s.players.RecordSolveTx(r.Context(), tx, playerID, s.solveRecord(r, round)); err != nil {
 					return err
 				}
 			}
@@ -643,14 +643,14 @@ func (s *Server) recordSolve(r *http.Request, round *game.Round) {
 	if s.players == nil {
 		return
 	}
-	p, ok := s.player(r)
+	id, ok := s.playerID(r)
 	if !ok {
 		return
 	}
 
-	err := s.players.RecordSolve(r.Context(), p.ID, s.solveRecord(r, round))
+	err := s.players.RecordSolve(r.Context(), id, s.solveRecord(r, round))
 	if err != nil {
-		s.log.Error("recording solve", "player", p.ID, "word", round.Reveal(), "err", err)
+		s.log.Error("recording solve", "player", id, "word", round.Reveal(), "err", err)
 	}
 }
 

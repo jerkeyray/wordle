@@ -372,27 +372,40 @@ func (p *Postgres) startRunRound(ctx context.Context, runID, roundID, expectedRo
 }
 
 // UpdateRoundAndRun commits a guess and its completed run snapshot atomically.
+//
+// Every guess goes through here, and the database is a long way from most
+// players, so it is written for round trips: BEGIN, lock the run (found from
+// the round in the same statement), lock the round, one statement for both
+// writes, COMMIT. The run is locked before the round, as everywhere else.
 func (p *Postgres) UpdateRoundAndRun(ctx context.Context, roundID string, fn func(*game.Round, *game.Run, pgx.Tx) error) (*game.Round, *game.Run, error) {
-	var initial roundRecord
-	if err := p.fetch(ctx, nil, "game_rounds", roundID, false, &initial); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil, game.ErrRoundNotFound
-		}
-		return nil, nil, err
-	}
-	if initial.RunID == "" {
-		return nil, nil, game.ErrRunNotFound
-	}
 	tx, err := p.pool.Begin(ctx)
 	if err != nil {
 		return nil, nil, err
 	}
 	defer tx.Rollback(ctx)
-	var rr runRecord
-	if err = p.fetch(ctx, tx, "game_runs", initial.RunID, true, &rr); err != nil {
-		if errors.Is(err, pgx.ErrNoRows) {
-			return nil, nil, game.ErrRunNotFound
+	cutoff := p.cutoff()
+	var runData []byte
+	err = tx.QueryRow(ctx, `
+		select data from game_runs
+		where id = (select data->>'runId' from game_rounds where id = $1 and updated_at > $2)
+		  and updated_at > $2
+		for update`, roundID, cutoff).Scan(&runData)
+	if errors.Is(err, pgx.ErrNoRows) {
+		// Rare, so it can afford a second look to say which one is missing.
+		var initial roundRecord
+		if ferr := p.fetch(ctx, tx, "game_rounds", roundID, false, &initial); ferr != nil {
+			if errors.Is(ferr, pgx.ErrNoRows) {
+				return nil, nil, game.ErrRoundNotFound
+			}
+			return nil, nil, ferr
 		}
+		return nil, nil, game.ErrRunNotFound
+	}
+	if err != nil {
+		return nil, nil, err
+	}
+	var rr runRecord
+	if err = json.Unmarshal(runData, &rr); err != nil {
 		return nil, nil, err
 	}
 	var br roundRecord
@@ -409,7 +422,7 @@ func (p *Postgres) UpdateRoundAndRun(ctx context.Context, roundID string, fn fun
 	if round.State != game.StatePlaying {
 		run.RecordRound(round)
 	}
-	runData, err := json.Marshal(newRunRecord(run))
+	newRunData, err := json.Marshal(newRunRecord(run))
 	if err != nil {
 		return nil, nil, err
 	}
@@ -417,10 +430,10 @@ func (p *Postgres) UpdateRoundAndRun(ctx context.Context, roundID string, fn fun
 	if err != nil {
 		return nil, nil, err
 	}
-	if _, err = tx.Exec(ctx, `update game_rounds set data=$2,updated_at=now() where id=$1`, roundID, roundData); err != nil {
-		return nil, nil, err
-	}
-	if _, err = tx.Exec(ctx, `update game_runs set data=$2,updated_at=now() where id=$1`, run.ID, runData); err != nil {
+	if _, err = tx.Exec(ctx, `
+		with saved_round as (update game_rounds set data = $2, updated_at = now() where id = $1)
+		update game_runs set data = $4, updated_at = now() where id = $3`,
+		roundID, roundData, run.ID, newRunData); err != nil {
 		return nil, nil, err
 	}
 	if err = tx.Commit(ctx); err != nil {

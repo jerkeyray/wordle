@@ -146,6 +146,21 @@ func (s *Server) player(r *http.Request) (players.Player, bool) {
 	return p, true
 }
 
+// playerID is player for callers that need only the ID; it is usually served
+// from memory rather than the database.
+func (s *Server) playerID(r *http.Request) (string, bool) {
+	userID, ok := auth.UserID(r.Context())
+	if !ok || s.players == nil {
+		return "", false
+	}
+	id, err := s.players.PlayerID(r.Context(), userID)
+	if err != nil {
+		s.log.Error("ensuring player", "user", userID, "err", err)
+		return "", false
+	}
+	return id, true
+}
+
 // requirePlayer writes the appropriate response so database failures cannot
 // masquerade as sign-out or cause clients to discard uncertain mutations.
 func (s *Server) requirePlayer(w http.ResponseWriter, r *http.Request) (players.Player, bool) {

@@ -9,6 +9,7 @@ import (
 	"errors"
 	"fmt"
 	"strings"
+	"sync"
 	"time"
 
 	"github.com/jackc/pgx/v5"
@@ -55,6 +56,35 @@ type Streak struct {
 
 type Store struct {
 	pool *pgxpool.Pool
+
+	// ids remembers which player each signed-in user is. That pairing never
+	// changes, and the hot paths (every guess, every new game) need only the
+	// ID, so they skip a database round trip. Names and the rest of the
+	// profile are always read fresh. Entries expire so a deleted account
+	// cannot linger in a long-lived process.
+	ids sync.Map // user ID -> cachedID
+}
+
+type cachedID struct {
+	id    string
+	until time.Time
+}
+
+const idCacheTTL = 10 * time.Minute
+
+// PlayerID is Ensure for callers that only need the player's ID, served from
+// memory when this process has seen the user recently.
+func (s *Store) PlayerID(ctx context.Context, userID string) (string, error) {
+	if v, ok := s.ids.Load(userID); ok {
+		if c := v.(cachedID); time.Now().Before(c.until) {
+			return c.id, nil
+		}
+	}
+	p, err := s.Ensure(ctx, userID)
+	if err != nil {
+		return "", err
+	}
+	return p.ID, nil
 }
 
 func New(pool *pgxpool.Pool) *Store { return &Store{pool: pool} }
@@ -89,6 +119,7 @@ func (s *Store) Ensure(ctx context.Context, userID string) (Player, error) {
 		from players where user_id = $1`, userID,
 	).Scan(&p.ID, &p.UserID, &p.DisplayName, &p.SeatColor, &p.InviteCode, &p.CreatedAt)
 	if err == nil {
+		s.ids.Store(userID, cachedID{id: p.ID, until: time.Now().Add(idCacheTTL)})
 		return p, nil
 	}
 	if !errors.Is(err, pgx.ErrNoRows) {
