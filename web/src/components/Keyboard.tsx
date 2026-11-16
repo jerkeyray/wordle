@@ -2,6 +2,7 @@
 
 import type { Mark } from "@/lib/api";
 import { MARK_LABEL } from "./Board";
+import { keepFocus } from "@/lib/keys";
 
 const ROWS = ["qwertyuiop", "asdfghjkl", "zxcvbnm"] as const;
 
@@ -33,6 +34,7 @@ export function Keyboard({
               key={letter}
               className="key"
               data-mark={letterStates[letter]}
+              onMouseDown={keepFocus}
               onClick={() => onKey(letter)}
               disabled={disabled}
               aria-label={
@@ -49,6 +51,7 @@ export function Keyboard({
           {i === 2 ? (
             <button
               className="key key--wide"
+              onMouseDown={keepFocus}
               onClick={onBackspace}
               disabled={disabled}
               aria-label="Delete letter"

@@ -2,8 +2,12 @@
 
 import { useEffect, useRef, type ReactNode } from "react";
 
-/** Native modal semantics provide focus trapping, Escape, and an inert background. */
-export function Dialog({ title, children, onClose, className = "" }: { title: string; children: ReactNode; onClose: () => void; className?: string }) {
+/**
+ * Native modal semantics provide focus trapping, Escape, and an inert background.
+ * `onEnter` is the dialog's main action: Enter runs it unless focus is on a
+ * control, which Enter activates as usual.
+ */
+export function Dialog({ title, children, onClose, onEnter, className = "" }: { title: string; children: ReactNode; onClose: () => void; onEnter?: () => void; className?: string }) {
   const ref = useRef<HTMLDialogElement>(null);
   const headingRef = useRef<HTMLSpanElement>(null);
   useEffect(() => {
@@ -17,7 +21,12 @@ export function Dialog({ title, children, onClose, className = "" }: { title: st
     };
   }, []);
   return (
-    <dialog ref={ref} className={`game-dialog entry ${className}`} aria-label={title} onCancel={(e) => { e.preventDefault(); onClose(); }}>
+    <dialog ref={ref} className={`game-dialog entry ${className}`} aria-label={title} onCancel={(e) => { e.preventDefault(); onClose(); }}
+      onKeyDown={(e) => {
+        if (!onEnter || e.key !== "Enter" || e.repeat || e.metaKey || e.ctrlKey || e.altKey) return;
+        if (e.target instanceof HTMLElement && e.target.closest("button, a, summary, input, textarea, select")) return;
+        e.preventDefault(); onEnter();
+      }}>
       <div className="dialog-heading">
         <span ref={headingRef} className="label" tabIndex={-1}>{title}</span>
         <button className="icon-button dialog-close" onClick={onClose} aria-label={`Close ${title}`}>

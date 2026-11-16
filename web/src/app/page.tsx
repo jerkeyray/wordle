@@ -1,6 +1,8 @@
 "use client";
 
 import Link from "next/link";
+import { useRouter } from "next/navigation";
+import { useKey } from "@/lib/keys";
 import { startTransition, useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { getHomeSummary, type HomeSummary } from "@/lib/api";
 import { ProfileButton } from "@/components/ProfileButton";
@@ -54,6 +56,11 @@ export default function Home() {
   }, []);
   useEffect(() => { if (configLoaded) writeLocal("wordle.mode", JSON.stringify(config)); }, [config, configLoaded]);
 
+  const playHref = `/play?length=${config.wordLength}&difficulty=${config.difficulty}`;
+  const router = useRouter();
+  // Enter is the one button on this page. Focused controls keep their own Enter.
+  useKey("Enter", () => router.push(playHref));
+
   return (
     <main className="home">
       <header className="home-top">
@@ -77,7 +84,7 @@ export default function Home() {
         </section>
         <HomeRow />
         <div className="home-actions">
-          <Link className="play" href={`/play?length=${config.wordLength}&difficulty=${config.difficulty}`}>
+          <Link className="play" href={playHref} aria-keyshortcuts="Enter">
             <span className="play-word">
               {savedRun ? "Continue" : "Begin"}
             </span>

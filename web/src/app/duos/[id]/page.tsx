@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { use, useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ApiError, getDuo, letterStates, mutateDuo, type Duo, type DuoMutation } from "@/lib/api";
+import { ApiError, getDuo, letterStates, mutateDuo, warmUp, type Duo, type DuoMutation } from "@/lib/api";
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { readLocal, writeLocal } from "@/lib/session";
 import { lettersPhrase } from "@/lib/letters";
@@ -16,6 +16,7 @@ import { WordExtras, WordMeta } from "@/components/WordFacts";
 import { dictionaryReady, isKnownWord, loadDictionary, serverDictionaryReady, subscribeDictionary } from "@/lib/dictionary";
 import { Presence } from "@/components/Presence";
 import type { EnterState } from "@/lib/useGame";
+import { isFreeKey, isOnControl, keepFocus, useKey } from "@/lib/keys";
 
 // `board` is how the board is addressed ("2026-10-05", then "2026-10-05.1").
 // Retry records written before boards had a sequence carry only `date`, which
@@ -143,6 +144,7 @@ function DuoBoard({id}: {id: string}) {
   const updateDraft = useCallback((next: string[]) => { setDraft(next); if (dayKey.current) writeLocal(dayKey.current, next.join("")); }, []);
   const type = useCallback((letter: string) => {
     if (!enabled) return;
+    warmUp();
     const typed = typeInto(draft, draftCursor, letter, wordLength);
     if (!typed) return;
     updateDraft(typed.draft);
@@ -189,15 +191,26 @@ function DuoBoard({id}: {id: string}) {
       setError(e instanceof Error ? e.message : "Could not start the next word. Try again.");
     } finally { lock.current = false; setBusy(false); }
   }, [duo, id, accept]);
+  // A finished board offers the next word, unless this is a past day opened by date.
+  const canStartNext = !!day && (day.state === "won" || day.state === "lost") && duo?.status === "active"
+    && typeof window !== "undefined" && !new URLSearchParams(window.location.search).has("date");
   useEffect(() => {
     const onKey = (e: KeyboardEvent) => {
-      if (e.ctrlKey || e.metaKey || e.altKey || e.target instanceof HTMLElement && e.target.closest("input,textarea,[contenteditable],dialog")) return;
-      if (e.key === "Enter") { e.preventDefault(); if (enabled) void submit(); }
+      if (!isFreeKey(e)) return;
+      if (e.key === "Enter") {
+        if (isOnControl(e)) return;
+        e.preventDefault();
+        if (enabled) void submit();
+        else if (canStartNext && !busy && !e.repeat) void startNext();
+      }
       else if (e.key === "Backspace") { e.preventDefault(); backspace(); }
       else if (/^[a-z]$/i.test(e.key)) type(e.key);
     };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, submit, backspace, type]);
+  }, [enabled, submit, backspace, type, canStartNext, busy, startNext]);
+  // "/" opens the clue, the same as the lightbulb.
+  useKey("/", () => setClueOpen(true), !!day && day.state === "playing" && !closedDate && !busy);
+  const canRevealClue = !!day && !day.hint && day.rows.length >= 3 && !busy && !hasPending;
   const other = duo?.members.find(m => m.id !== duo.viewerId);
   const status = day?.state === "won" ? "Solved together" : day?.state === "lost" ? "Out of guesses" : day?.state === "expired" ? "Day finished" : day?.state === "closed" || duo?.status === "ended" ? "Daily game ended" : yourTurn ? "Your turn" : `${other?.name || "Friend"}’s turn`;
 
@@ -210,7 +223,7 @@ function DuoBoard({id}: {id: string}) {
         return <span className="duo-member" key={m.id} data-seat={seat} data-current={active} aria-current={active ? "step" : undefined}><i aria-hidden>{m.name.slice(0, 1).toUpperCase()}</i><span>{m.id === duo.viewerId ? "You" : m.name}</span></span>;
       })}</div>
       <div className="rule" />
-      <div className="board-area"><div className="board-stage"><Board rows={day.rows} authors={day.rows.map(r => duo.members.find(m => m.id === r.playerId)?.name || "Friend")} authorSeats={day.rows.map(r => duo.members.findIndex(m => m.id === r.playerId))} draft={draft} wordLength={day.wordLength} maxRows={day.maxRows} revealingRow={null} shake={false} onDraftTileSelect={yourTurn ? selectDraftTile : undefined} draftCursor={draftCursor} />{day.state === "playing" && !closedDate && <button className="icon-button hint-button game-hint" disabled={busy && !clueOpen} onClick={() => setClueOpen(true)} aria-label={day.hint ? "Clue revealed" : "Clue"} title={day.hint ? "Clue revealed" : "Clue"}>
+      <div className="board-area"><div className="board-stage"><Board rows={day.rows} authors={day.rows.map(r => duo.members.find(m => m.id === r.playerId)?.name || "Friend")} authorSeats={day.rows.map(r => duo.members.findIndex(m => m.id === r.playerId))} draft={draft} wordLength={day.wordLength} maxRows={day.maxRows} revealingRow={null} shake={false} onDraftTileSelect={yourTurn ? selectDraftTile : undefined} draftCursor={draftCursor} />{day.state === "playing" && !closedDate && <button className="icon-button hint-button game-hint" disabled={busy && !clueOpen} onClick={() => setClueOpen(true)} aria-label={day.hint ? "Clue revealed" : "Clue"} title={day.hint ? "Clue revealed (/)" : "Clue (/)"} aria-keyshortcuts="/">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M9 18h6M10 21h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           <path d="M12 3a6 6 0 0 0-3.6 10.8c.5.4.8 1 .9 1.6l.1.6h5.2l.1-.6c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
@@ -224,8 +237,8 @@ function DuoBoard({id}: {id: string}) {
       <div className="sr-only" role="status" aria-live="polite">{day.rows.at(-1)?.guess.split("").map((letter, i) => `${letter}: ${MARK_LABEL[day.rows.at(-1)!.marks[i]]}`).join("; ")}</div>
       {day.state !== "playing" ? <div className="game-tools"><span role="status">{reconnecting ? "Reconnecting…" : status}</span></div> : null}
       {error && <div className="duo-error" role="alert">{error}</div>}
-      {closedDate ? <section className="duo-result"><p>{closedDate} has finished.</p><button className="button" onClick={() => { setClosedDate(null); updateDraft([]); setDraftCursor(0); }}>Today’s word</button></section> : day.state === "playing" ? yourTurn ? <><div className="rule" /><Keyboard letterStates={letterStates(day.rows)} onKey={type} onBackspace={backspace} disabled={!enabled} /><div className="play-actions"><button className="button keyboard-submit" data-state={enterState} disabled={!enabled || enterState === "incomplete"} onClick={() => void submit()}>Submit</button></div></> : <section className="duo-waiting" role="status"><span className="label">Shared board</span><p>Waiting for {other?.name || "your friend"}</p><span>You’ll take the next turn.</span></section> : <section className="duo-result"><h2>{day.answer}</h2><WordMeta entry={day.entry} /><p>{day.entry?.definition}</p><WordExtras entry={day.entry} />{day.entry?.note && <details><summary>Read more</summary><p>{day.entry.note}</p></details>}{(day.state === "won" || day.state === "lost") && duo.status === "active" && !new URLSearchParams(window.location.search).has("date") && <button className="button" disabled={busy} onClick={() => void startNext()}>{busy ? "Starting…" : "Next word"}</button>}</section>}
-      {clueOpen && day.state === "playing" && <Dialog title="Clue" onClose={() => setClueOpen(false)} className="clue-dialog">
+      {closedDate ? <section className="duo-result"><p>{closedDate} has finished.</p><button className="button" onClick={() => { setClosedDate(null); updateDraft([]); setDraftCursor(0); }}>Today’s word</button></section> : day.state === "playing" ? yourTurn ? <><div className="rule" /><Keyboard letterStates={letterStates(day.rows)} onKey={type} onBackspace={backspace} disabled={!enabled} /><div className="play-actions"><button className="button keyboard-submit" data-state={enterState} disabled={!enabled || enterState === "incomplete"} onMouseDown={keepFocus} onClick={() => void submit()} aria-keyshortcuts="Enter">Submit</button></div></> : <section className="duo-waiting" role="status"><span className="label">Shared board</span><p>Waiting for {other?.name || "your friend"}</p><span>You’ll take the next turn.</span></section> : <section className="duo-result"><h2>{day.answer}</h2><WordMeta entry={day.entry} /><p>{day.entry?.definition}</p><WordExtras entry={day.entry} />{day.entry?.note && <details><summary>Read more</summary><p>{day.entry.note}</p></details>}{canStartNext && <button className="button" disabled={busy} onClick={() => void startNext()} aria-keyshortcuts="Enter">{busy ? "Starting…" : "Next word"}</button>}</section>}
+      {clueOpen && day.state === "playing" && <Dialog title="Clue" onClose={() => setClueOpen(false)} onEnter={() => canRevealClue ? void submit("hint") : setClueOpen(false)} className="clue-dialog">
         <section className="hint-panel">
           {day.hint && <ol className="hint-list"><li><p>{day.hint.text}</p></li></ol>}
           {!day.hint && <div className="hint-next">

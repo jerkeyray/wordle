@@ -295,3 +295,36 @@ button.tile:focus-visible {
   pointer-events: none;
 }
 
+
+/* ---------------------------------------------------------------------------
+   Keyboard shortcuts: a faint corner link on desktop, and the map it opens.
+   The link only exists where there is a real keyboard and room for it: a fine
+   pointer that can hover, and a window wide enough that the corner is empty.
+--------------------------------------------------------------------------- */
+kbd {
+  display: inline-flex; align-items: center; justify-content: center;
+  min-width: 1.7em; height: 1.7em; padding: 0 .45em;
+  border: 1px solid var(--border-strong); border-bottom-width: 2px; border-radius: 6px;
+  background: var(--bg); color: var(--text);
+  font: 600 .78rem/1 var(--font-sans), system-ui, sans-serif;
+}
+
+.keys-hint { display: none; }
+@media (hover: hover) and (pointer: fine) and (min-width: 900px) and (min-height: 560px) {
+  .keys-hint {
+    position: fixed; right: 20px; bottom: 18px; z-index: 5;
+    display: inline-flex; align-items: center; gap: 8px;
+    padding: 6px 8px; border: 0; border-radius: 8px; background: none;
+    color: var(--text-faint); font: 500 .8rem/1 var(--font-sans), system-ui, sans-serif;
+    cursor: pointer; opacity: .7; transition: opacity .15s ease, color .15s ease;
+  }
+  .keys-hint kbd { min-width: 1.5em; height: 1.5em; color: var(--text-faint); background: transparent; border-color: var(--border); }
+  .keys-hint:hover, .keys-hint:focus-visible { opacity: 1; color: var(--text-muted); }
+}
+
+.keys-dialog .keys-group + .keys-group { margin-top: 16px; padding-top: 14px; border-top: 1px solid var(--rule); }
+.keys-group-title { margin: 0 0 8px; color: var(--text-faint); font: 600 .7rem/1.2 var(--font-sans), system-ui, sans-serif; letter-spacing: .12em; text-transform: uppercase; }
+.keys-dialog dl { display: grid; gap: 8px; margin: 0; }
+.keys-row { display: grid; grid-template-columns: 7.5rem 1fr; align-items: center; gap: 12px; }
+.keys-row dt { display: flex; align-items: center; gap: 4px; color: var(--text-faint); }
+.keys-row dd { margin: 0; color: var(--text-muted); font-size: .9rem; }

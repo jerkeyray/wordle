@@ -1,7 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "react";
-import { ApiError, createRun, getRound, getRun, letterStates, startRunRound, submitGuess, revealHint, type Round, type Run } from "./api";
+import { ApiError, createRun, getRound, getRun, letterStates, startRunRound, submitGuess, revealHint, warmUp, type Round, type Run } from "./api";
 import { activeRunFor, clearActiveRunFor, clearPendingNextRoundRequestFor, clearPendingRunRequestFor, pendingNextRoundRequestFor, pendingRunRequestFor, type GameConfig, playedWords, rememberRun } from "./session";
 import { lettersPhrase } from "./letters";
 import { deleteLetter, typeInto } from "./draft";
@@ -179,6 +179,7 @@ export function useGame(config: GameConfig = { wordLength: 5, difficulty: "mixed
         : "word";
   const typeLetter = useCallback((letter: string) => {
     if (!playable || !round) return;
+    warmUp();
     const typed = typeInto(draftRef.current, draftCursorRef.current, letter, round.wordLength);
     if (!typed) return;
     draftRef.current = typed.draft;
@@ -233,6 +234,13 @@ export function useGame(config: GameConfig = { wordLength: 5, difficulty: "mixed
     } catch (err) { if (mounted.current) fail(err); }
     finally { lock.current = false; if (mounted.current) setBusy(false); }
   }, [playable, round, fail]);
+
+  // Coming back to a board after a while: wake the server now, not on Enter.
+  useEffect(() => {
+    const onVisible = () => { if (document.visibilityState === "visible") warmUp(); };
+    document.addEventListener("visibilitychange", onVisible);
+    return () => document.removeEventListener("visibilitychange", onVisible);
+  }, []);
 
   useEffect(() => {
     function onKeyDown(e: KeyboardEvent) {

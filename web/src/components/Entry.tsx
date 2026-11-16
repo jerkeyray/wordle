@@ -50,7 +50,7 @@ export function Entry({ round, onClose, action, actionLabel, busy = false }: {
   }
 
   return (
-    <Dialog title="Word entry" onClose={onClose} className="entry-dialog">
+    <Dialog title="Word entry" onClose={onClose} onEnter={busy ? undefined : action ?? onClose} className="entry-dialog">
       <div className="entry-word-row">
         <h2 className="entry-word">{round.answer}</h2>
         <div className="entry-tools">

@@ -1,0 +1,29 @@
+{
+  "answers": 4963,
+  "retired": 13,
+  "dictionary": 35084,
+  "slang": 247,
+  "lengths": [
+    {
+      "length": 5,
+      "total": 2651,
+      "familiar": 1634,
+      "stretch": 787,
+      "challenging": 230
+    },
+    {
+      "length": 6,
+      "total": 2312,
+      "familiar": 1572,
+      "stretch": 590,
+      "challenging": 150
+    }
+  ],
+  "coverage": {
+    "pronunciation": 4469,
+    "partOfSpeech": 4409,
+    "origin": 3686,
+    "example": 1716,
+    "exampleFromTatoeba": 425
+  }
+}

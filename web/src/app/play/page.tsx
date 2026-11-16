@@ -10,6 +10,7 @@ import { Entry } from "@/components/Entry";
 import { Dialog } from "@/components/Dialog";
 import { ProfileButton } from "@/components/ProfileButton";
 import { useGame } from "@/lib/useGame";
+import { keepFocus, useKey } from "@/lib/keys";
 import type { Round } from "@/lib/api";
 import { Loader } from "@/components/Loader";
 import { parseDifficulty, type GameConfig } from "@/lib/session";
@@ -47,15 +48,21 @@ function PlayScreen({config}: {config: GameConfig}) {
     </div>
     <p className="hint gate-foot"><Link href="/">Back home</Link></p>
   </section>;
-  if (!round || !run) return <main className="loading">{error || <Loader label="Setting the type" />}</main>;
-
+  const finished = game.finished;
+  const activeEntry = round ? selected ?? (finished && dismissedRound !== round.id ? round : null) : null;
   const advance = () => {
+    if (!round) return;
     setPanel(null);setSelected(null);setDismissedRound(round.id);
     void game.newRun();
   };
+  // With the entry closed, Enter on a finished board moves on, as the
+  // highlighted Next word button would.
+  useKey("Enter", advance, finished && !activeEntry && !panel && !game.busy);
+  // "/" opens the clue, the same as the lightbulb (and only when it is enabled).
+  const clueButtonEnabled = !!round && !finished && !game.busy && game.revealingRow === null && (round.state === "playing" || round.hintsUsed > 0);
+  useKey("/", () => setPanel("hints"), clueButtonEnabled && !activeEntry && !panel);
+  if (!round || !run) return <main className="loading">{error || <Loader label="Setting the type" />}</main>;
 
-  const finished = game.finished;
-  const activeEntry = selected ?? (finished && dismissedRound !== round.id ? round : null);
   const hintsUsed = round.hintsUsed;
   const hintAvailable = hintsUsed === 0 && round.rows.length >= 3;
 
@@ -73,7 +80,7 @@ function PlayScreen({config}: {config: GameConfig}) {
     <div className="board-area">
       <div className="board-stage">
       <Board rows={round.rows} draft={game.draft} wordLength={round.wordLength} maxRows={round.maxRows} revealingRow={game.revealingRow} shake={game.shake} onDraftTileSelect={game.selectDraftTile} draftCursor={game.draftCursor} />
-      {!finished && <button className="icon-button hint-button game-hint" disabled={game.busy || game.revealingRow !== null || (round.state !== "playing" && !hintsUsed)} onClick={() => setPanel("hints")} aria-label={hintsUsed ? "Clue used" : "Clue"} title={hintsUsed ? "Clue used" : "Clue"}>
+      {!finished && <button className="icon-button hint-button game-hint" disabled={game.busy || game.revealingRow !== null || (round.state !== "playing" && !hintsUsed)} onClick={() => setPanel("hints")} aria-label={hintsUsed ? "Clue used" : "Clue"} title={hintsUsed ? "Clue used (/)" : "Clue (/)"} aria-keyshortcuts="/">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M9 18h6M10 21h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           <path d="M12 3a6 6 0 0 0-3.6 10.8c.5.4.8 1 .9 1.6l.1.6h5.2l.1-.6c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
@@ -85,19 +92,19 @@ function PlayScreen({config}: {config: GameConfig}) {
     <div className="sr-only" role="status" aria-live="polite">{game.revealingRow === null && round.rows.length > 0 ? round.rows.at(-1)?.guess.split("").map((letter, i) => `${letter}: ${MARK_LABEL[round.rows.at(-1)!.marks[i]]}`).join("; ") : ""}</div>
     {finished ? <div className="finished-actions">
       <button className="button button--quiet" onClick={() => setSelected(round)}>Word entry</button>
-      <button className="button" disabled={game.busy} onClick={advance}>Next word</button>
+      <button className="button" disabled={game.busy} onClick={advance} aria-keyshortcuts="Enter">Next word</button>
     </div> : <>
       <Keyboard letterStates={game.letterStates} onKey={game.typeLetter} onBackspace={game.backspace} disabled={game.inputDisabled} />
       {/* Centred rather than stretched edge to edge, so the thing you press on
           every guess sits under the thumb instead of spanning the screen. */}
       <div className="play-actions">
-        <button className="button keyboard-submit" data-state={game.enterState} disabled={game.inputDisabled || game.enterState === "incomplete"} onClick={game.submit}>Submit</button>
+        <button className="button keyboard-submit" data-state={game.enterState} disabled={game.inputDisabled || game.enterState === "incomplete"} onMouseDown={keepFocus} onClick={game.submit} aria-keyshortcuts="Enter">Submit</button>
       </div>
     </>}
     {game.message && <div className="toast" role="status">{game.message}</div>}
     {error && <Dialog title="Game interrupted" onClose={() => { void game.retry(); }}>{error}</Dialog>}
     {!game.error && !panel && activeEntry && <Entry key={activeEntry.id} round={activeEntry} onClose={() => { setSelected(null); setDismissedRound(round.id); }} action={activeEntry.id === round.id ? advance : undefined} actionLabel="Next word" busy={game.busy} />}
-    {!game.error && panel === "hints" && <Dialog title="Clue" onClose={() => setPanel(null)} className="clue-dialog">
+    {!game.error && panel === "hints" && <Dialog title="Clue" onClose={() => setPanel(null)} onEnter={() => round.state === "playing" && hintAvailable && !game.busy ? void game.requestHint() : setPanel(null)} className="clue-dialog">
       <section className="hint-panel">
         {round.hints.length > 0 && <ol className="hint-list">{round.hints.slice(0, 1).map((hint) => <li key={hint.tier}><p>{hint.text}</p></li>)}</ol>}
         {round.state === "playing" && hintsUsed === 0 && <div className="hint-next">

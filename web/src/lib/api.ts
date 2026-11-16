@@ -1,4 +1,4 @@
-import type { CollectionPage, Duo, DuoMutation, FriendProfile, PlayInvitation, PlayInviteMutation, FriendRecord, HomeSummary, Mark, WordStats, Profile, Round, Row, Run } from "./contracts";
+import type { CollectionPage, Duo, DuoMutation, FriendProfile, PlayInvitation, PlayInviteMutation, FriendRecord, HomeSummary, Mark, Profile, Round, Row, Run } from "./contracts";
 import type { GameDifficulty } from "./session";
 export type { Mark, RoundState, Row, Entry, Run, Round, Profile, HomeSummary, SolveRecord, CollectionPage, FriendRecord, FriendProfile, PairStats, PlayInvitation, PlayInviteMutation, DuoDay, Duo, DuoMutation, WordStats } from "./contracts";
 
@@ -64,7 +64,24 @@ export class ApiError extends Error {
   }
 }
 
+/**
+ * When the API was last asked anything. After a quiet spell the server may
+ * have gone cold: Vercel stops an idle container, and Neon suspends an idle
+ * database, and waking both costs seconds. warmUp() spends that on a cheap
+ * request while the player is still typing, instead of on the guess.
+ */
+let lastContact = 0;
+const WARM_FOR_MS = 45_000;
+
+export function warmUp(): void {
+  if (typeof window === "undefined" || Date.now() - lastContact < WARM_FOR_MS) return;
+  lastContact = Date.now();
+  // /api/ready pings the database too, so it wakes both halves.
+  void fetch(`${API_URL}/api/ready`, { cache: "no-store" }).catch(() => {});
+}
+
 async function request<T>(path: string, init?: RequestInit, retry = 0): Promise<T> {
+  lastContact = Date.now();
   // Signing in is optional. A token makes the round count towards your
   // history; without one you still get a perfectly good game.
   let token: string | null;
@@ -228,7 +245,6 @@ export const mutateDuo = (id: string, action: "accept" | "decline" | "cancel" | 
 
 export const getProfile = (signal?:AbortSignal) => request<Profile>("/api/me",{signal});
 export const getHomeSummary = () => request<HomeSummary>("/api/me/home");
-export const getWordStats = () => request<WordStats>("/api/words/stats");
 
 export const setDisplayName = (name: string) =>
   request<{ displayName: string }>("/api/me/name", {
