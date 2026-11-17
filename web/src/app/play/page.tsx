@@ -79,7 +79,7 @@ function PlayScreen({config}: {config: GameConfig}) {
     </header>
     <div className="board-area">
       <div className="board-stage">
-      <Board rows={round.rows} draft={game.draft} wordLength={round.wordLength} maxRows={round.maxRows} revealingRow={game.revealingRow} shake={game.shake} onDraftTileSelect={game.selectDraftTile} draftCursor={game.draftCursor} />
+      <Board rows={round.rows} draft={game.draft} wordLength={round.wordLength} maxRows={round.maxRows} revealingRow={game.revealingRow} shake={game.shake} pending={game.sending} onDraftTileSelect={game.selectDraftTile} draftCursor={game.draftCursor} />
       {!finished && <button className="icon-button hint-button game-hint" disabled={game.busy || game.revealingRow !== null || (round.state !== "playing" && !hintsUsed)} onClick={() => setPanel("hints")} aria-label={hintsUsed ? "Clue used" : "Clue"} title={hintsUsed ? "Clue used (/)" : "Clue (/)"} aria-keyshortcuts="/">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M9 18h6M10 21h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />

@@ -32,6 +32,25 @@
   40%, 60% { transform: translateX(7px); }
 }
 
+/* A guess on its way. The row answers Enter at once with a small wave along
+   its tiles, and the flip takes over when the marks arrive, so the round trip
+   reads as the board thinking rather than as nothing happening. */
+.row[data-pending="true"] .tile {
+  border-color: var(--border-strong);
+  animation: sending 0.84s cubic-bezier(0.45, 0, 0.55, 1) infinite;
+  animation-delay: calc(var(--reveal-index) * 0.07s);
+}
+
+@keyframes sending {
+  0%, 55%, 100% { transform: translateY(0); }
+  25% { transform: translateY(-5px); }
+}
+
+/* Without motion, a dimmed row says the same thing. */
+@media (prefers-reduced-motion: reduce) {
+  .row[data-pending="true"] .tile { opacity: 0.6; }
+}
+
 /* ---------------------------------------------------------------------------
    Tiles — letterpress blocks
 

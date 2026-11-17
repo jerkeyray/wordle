@@ -94,6 +94,8 @@ interface BoardProps {
   revealingRow: number | null;
   /** Set when a guess was rejected, to shake the draft row. */
   shake: boolean;
+  /** Set while the draft row's guess is on its way to the server. */
+  pending?: boolean;
   authors?: string[];
   authorSeats?: number[];
   /** Lets the active player replace a letter without clearing their whole guess. */
@@ -108,6 +110,7 @@ export function Board({
   maxRows,
   revealingRow,
   shake,
+  pending = false,
   authors,
   authorSeats,
   onDraftTileSelect,
@@ -134,6 +137,8 @@ export function Board({
             className="row"
             key={rowIndex}
             data-shake={isDraft && shake ? "true" : undefined}
+            data-pending={isDraft && pending ? "true" : undefined}
+            aria-busy={isDraft && pending ? true : undefined}
           >
             {authors?.[rowIndex] && <span className="row-author" data-seat={authorSeats?.[rowIndex]} title={authors[rowIndex]} aria-label={`Guessed by ${authors[rowIndex]}`}>{authors[rowIndex].slice(0, 1).toUpperCase()}</span>}
             {Array.from({ length: wordLength }, (_, col) => (

@@ -86,6 +86,8 @@ export function useGame(config: GameConfig = { wordLength: 5, difficulty: "mixed
   const [draftCursor, setDraftCursor] = useState(0);
   const draftCursorRef = useRef(0);
   const [busy, setBusy] = useState(false);
+  // A guess on its way to the server, so the board can answer Enter at once.
+  const [sending, setSending] = useState(false);
   const lock = useRef(false);
   const [message, setMessage] = useState<string | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -208,7 +210,7 @@ export function useGame(config: GameConfig = { wordLength: 5, difficulty: "mixed
   const submit = useCallback(async () => {
     if (!playable || !round || lock.current) return;
     if (!draftComplete) { reject(`Enter ${lettersPhrase(round.wordLength)}`); return; }
-    lock.current = true; setBusy(true);
+    lock.current = true; setBusy(true); setSending(true);
     try {
       const result = await submitGuess(round.id, draftWord);
       if (!mounted.current) return;
@@ -223,7 +225,7 @@ export function useGame(config: GameConfig = { wordLength: 5, difficulty: "mixed
     } catch (err) {
       if (err instanceof ApiError && ["wrong_length", "not_a_word"].includes(err.code)) reject(err.message);
       else fail(err); // Retry reads server state before accepting another guess.
-    } finally { lock.current = false; if (mounted.current) setBusy(false); }
+    } finally { lock.current = false; if (mounted.current) { setBusy(false); setSending(false); } }
   }, [playable, round, draftComplete, draftWord, reject, later, fail, wordLength, difficulty]);
   const requestHint = useCallback(async () => {
     if (!playable || !round || lock.current) return;
@@ -258,7 +260,7 @@ export function useGame(config: GameConfig = { wordLength: 5, difficulty: "mixed
   }, [submit, backspace, typeLetter]);
 
   return {
-    run, round, draft, draftCursor, busy, message, error, expired, shake, revealingRow,
+    run, round, draft, draftCursor, busy, sending, message, error, expired, shake, revealingRow,
     finished: !!round && round.state !== "playing" && revealedRows === round.rows.length,
     letterStates: letterStates(round?.rows.slice(0, revealedRows) ?? []),
     inputDisabled: !playable, enterState,

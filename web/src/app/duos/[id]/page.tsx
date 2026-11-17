@@ -34,6 +34,8 @@ function DuoBoard({id}: {id: string}) {
   const [error, setError] = useState("");
   const [reconnecting, setReconnecting] = useState(false);
   const [busy, setBusy] = useState(false);
+  // A guess on its way to the server, so the board can answer Enter at once.
+  const [sendingGuess, setSendingGuess] = useState(false);
   const [hasPending, setHasPending] = useState(false);
   const [signedOut, setSignedOut] = useState(false);
   const [closedDate, setClosedDate] = useState<string | null>(null);
@@ -166,6 +168,7 @@ function DuoBoard({id}: {id: string}) {
     if (!pending.current && action !== "hint" && !yourTurn) return;
     if (!pending.current && action === "guesses" && !draftComplete) { setError(`Enter ${lettersPhrase(duo.today.wordLength)}`); return; }
     lock.current = true; setBusy(true); setError("");
+    setSendingGuess((pending.current?.action ?? action) === "guesses");
     try {
       if (!pending.current) {
         pending.current = { action, board: duo.today.board, mutation: { requestId: crypto.randomUUID(), version: duo.today.version, ...(action === "guesses" ? { guess: draftWord } : {}) } };
@@ -175,7 +178,7 @@ function DuoBoard({id}: {id: string}) {
       await sendPending();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not submit. Your move will be checked automatically.");
-    } finally { lock.current = false; setBusy(false); }
+    } finally { lock.current = false; setBusy(false); setSendingGuess(false); }
   }, [duo, yourTurn, draftComplete, draftWord, sendPending]);
   // Starts another board today. Either friend can, once the last one is over.
   // If the other friend already did, the server hands back that board instead
@@ -223,7 +226,7 @@ function DuoBoard({id}: {id: string}) {
         return <span className="duo-member" key={m.id} data-seat={seat} data-current={active} aria-current={active ? "step" : undefined}><i aria-hidden>{m.name.slice(0, 1).toUpperCase()}</i><span>{m.id === duo.viewerId ? "You" : m.name}</span></span>;
       })}</div>
       <div className="rule" />
-      <div className="board-area"><div className="board-stage"><Board rows={day.rows} authors={day.rows.map(r => duo.members.find(m => m.id === r.playerId)?.name || "Friend")} authorSeats={day.rows.map(r => duo.members.findIndex(m => m.id === r.playerId))} draft={draft} wordLength={day.wordLength} maxRows={day.maxRows} revealingRow={null} shake={false} onDraftTileSelect={yourTurn ? selectDraftTile : undefined} draftCursor={draftCursor} />{day.state === "playing" && !closedDate && <button className="icon-button hint-button game-hint" disabled={busy && !clueOpen} onClick={() => setClueOpen(true)} aria-label={day.hint ? "Clue revealed" : "Clue"} title={day.hint ? "Clue revealed (/)" : "Clue (/)"} aria-keyshortcuts="/">
+      <div className="board-area"><div className="board-stage"><Board rows={day.rows} authors={day.rows.map(r => duo.members.find(m => m.id === r.playerId)?.name || "Friend")} authorSeats={day.rows.map(r => duo.members.findIndex(m => m.id === r.playerId))} draft={draft} wordLength={day.wordLength} maxRows={day.maxRows} revealingRow={null} shake={false} pending={sendingGuess} onDraftTileSelect={yourTurn ? selectDraftTile : undefined} draftCursor={draftCursor} />{day.state === "playing" && !closedDate && <button className="icon-button hint-button game-hint" disabled={busy && !clueOpen} onClick={() => setClueOpen(true)} aria-label={day.hint ? "Clue revealed" : "Clue"} title={day.hint ? "Clue revealed (/)" : "Clue (/)"} aria-keyshortcuts="/">
         <svg width="20" height="20" viewBox="0 0 24 24" fill="none" aria-hidden>
           <path d="M9 18h6M10 21h4" stroke="currentColor" strokeWidth="1.7" strokeLinecap="round" />
           <path d="M12 3a6 6 0 0 0-3.6 10.8c.5.4.8 1 .9 1.6l.1.6h5.2l.1-.6c.1-.6.4-1.2.9-1.6A6 6 0 0 0 12 3Z" stroke="currentColor" strokeWidth="1.7" strokeLinejoin="round" />
