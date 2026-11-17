@@ -10,6 +10,7 @@ const GROUPS: { title: string; keys: [keys: string[], does: string][] }[] = [
     keys: [
       [["A", "–", "Z"], "Type a letter"],
       [["Backspace"], "Delete a letter"],
+      [["←", "→"], "Move between letters"],
       [["Enter"], "Submit the guess"],
       [["/"], "Open the clue, then Enter to reveal it"],
     ],

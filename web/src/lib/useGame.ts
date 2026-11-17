@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from "
 import { ApiError, createRun, getRound, getRun, letterStates, startRunRound, submitGuess, revealHint, warmUp, type Round, type Run } from "./api";
 import { activeRunFor, clearActiveRunFor, clearPendingNextRoundRequestFor, clearPendingRunRequestFor, pendingNextRoundRequestFor, pendingRunRequestFor, type GameConfig, playedWords, rememberRun } from "./session";
 import { lettersPhrase } from "./letters";
-import { deleteLetter, typeInto } from "./draft";
+import { deleteLetter, moveCursor, typeInto } from "./draft";
 import { dictionaryReady, isKnownWord, loadDictionary, serverDictionaryReady, subscribeDictionary } from "./dictionary";
 
 /** How the Enter key presents itself. */
@@ -253,11 +253,16 @@ export function useGame(config: GameConfig = { wordLength: 5, difficulty: "mixed
         e.preventDefault(); void submit();
       }
       else if (e.key === "Backspace") { e.preventDefault(); backspace(); }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        if (!round) return;
+        e.preventDefault();
+        selectDraftTile(moveCursor(draftCursorRef.current, e.key === "ArrowLeft" ? -1 : 1, round.wordLength));
+      }
       else if (/^[a-zA-Z]$/.test(e.key)) typeLetter(e.key.toLowerCase());
     }
     window.addEventListener("keydown", onKeyDown);
     return () => window.removeEventListener("keydown", onKeyDown);
-  }, [submit, backspace, typeLetter]);
+  }, [submit, backspace, typeLetter, selectDraftTile, round]);
 
   return {
     run, round, draft, draftCursor, busy, sending, message, error, expired, shake, revealingRow,

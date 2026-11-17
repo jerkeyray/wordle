@@ -29,3 +29,12 @@ export function deleteLetter(draft: string[], cursor: number, length: number): {
   next[position] = "";
   return { draft: next, cursor: position };
 }
+
+/**
+ * Moves the cursor one box left or right, for the arrow keys. It stays on the
+ * word: from "past the end", left lands on the last box, and neither key goes
+ * beyond the first or last box.
+ */
+export function moveCursor(cursor: number, by: -1 | 1, length: number): number {
+  return Math.max(0, Math.min(Math.min(cursor, length) + by, length - 1));
+}

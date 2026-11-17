@@ -6,7 +6,7 @@ import { ApiError, getDuo, letterStates, mutateDuo, warmUp, type Duo, type DuoMu
 import { useVisiblePolling } from "@/lib/useVisiblePolling";
 import { readLocal, writeLocal } from "@/lib/session";
 import { lettersPhrase } from "@/lib/letters";
-import { deleteLetter, typeInto } from "@/lib/draft";
+import { deleteLetter, moveCursor, typeInto } from "@/lib/draft";
 import { Board, MARK_LABEL } from "@/components/Board";
 import { Keyboard } from "@/components/Keyboard";
 import { BackButton } from "@/components/BackButton";
@@ -207,10 +207,14 @@ function DuoBoard({id}: {id: string}) {
         else if (canStartNext && !busy && !e.repeat) void startNext();
       }
       else if (e.key === "Backspace") { e.preventDefault(); backspace(); }
+      else if (e.key === "ArrowLeft" || e.key === "ArrowRight") {
+        e.preventDefault();
+        selectDraftTile(moveCursor(draftCursor, e.key === "ArrowLeft" ? -1 : 1, wordLength));
+      }
       else if (/^[a-z]$/i.test(e.key)) type(e.key);
     };
     window.addEventListener("keydown", onKey); return () => window.removeEventListener("keydown", onKey);
-  }, [enabled, submit, backspace, type, canStartNext, busy, startNext]);
+  }, [enabled, submit, backspace, type, canStartNext, busy, startNext, selectDraftTile, draftCursor, wordLength]);
   // "/" opens the clue, the same as the lightbulb.
   useKey("/", () => setClueOpen(true), !!day && day.state === "playing" && !closedDate && !busy);
   const canRevealClue = !!day && !day.hint && day.rows.length >= 3 && !busy && !hasPending;
