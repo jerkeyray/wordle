@@ -1,3 +1,6 @@
+# Not used in production: both halves deploy to Vercel (see vercel.json and
+# docs/development.md). Kept for running the API on Fly if that is ever wanted.
+#
 # The Go API. Deploy from this directory with `fly deploy`.
 #
 # Secrets are NOT set here — `fly secrets set` keeps them out of the repo:
@@ -9,12 +12,9 @@
 
 app = "wordle-api"
 
-# Mumbai, because the phone talks to this API on every guess while the database
-# is only touched when a round ends or a profile loads. Neon sits in us-east-2,
-# so those few queries pay ~220ms from here — the right side of the trade when
-# the alternative is paying it on every guess instead. If history ever feels
-# slow, the fix is a Neon project nearer to here, not an API nearer to Neon.
-primary_region = "bom"
+# Every guess reads and writes Postgres, so the API belongs next to the
+# database. Neon is in Singapore (ap-southeast-1).
+primary_region = "sin"
 
 [build]
   dockerfile = "Dockerfile"

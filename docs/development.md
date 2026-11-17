@@ -179,6 +179,11 @@ Both halves ship as one Vercel deployment. `vercel.json` declares two services â
 `web` (Next.js) and `api` (the Go server, built from `server/Dockerfile`) â€” and
 routes between them.
 
+Functions run in `sin1` (Singapore), set by `regions` in `vercel.json`, next to
+the Neon project in `aws-ap-southeast-1`. Every guess makes several sequential
+database queries, so the API and the database must stay in the same region;
+move both together or neither.
+
 They share an origin, which removes a whole category of problem: no CORS, no
 cookie-domain juggling, and no `NEXT_PUBLIC_API_URL` to keep in sync. The
 client defaults to the empty string in production, so every request goes to the
