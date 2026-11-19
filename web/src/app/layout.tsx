@@ -1,6 +1,7 @@
 import type { Metadata, Viewport } from "next";
 import { Instrument_Sans, Fraunces } from "next/font/google";
 import "./globals.css";
+import { Analytics } from "@vercel/analytics/next";
 import { Shortcuts } from "@/components/Shortcuts";
 
 // The sans carries the chrome only: keyboard, labels, buttons. It stays
@@ -32,7 +33,7 @@ export const metadata: Metadata = {
     siteName: "Wordle",
     title: "Wordle",
     description: "A word game for curious people. Solve, save words, and learn what they mean.",
-    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Wordle: a solved board for SOLACE beside its dictionary entry" }],
+    images: [{ url: "/opengraph-image", width: 1200, height: 630, alt: "Wordle" }],
   },
   twitter: {
     card: "summary_large_image",
@@ -97,7 +98,7 @@ export default function RootLayout({
       <head>
         <script dangerouslySetInnerHTML={{ __html: themeScript }} />
       </head>
-      <body className={`${sans.variable} ${serif.variable}`}>{children}<Shortcuts /></body>
+      <body className={`${sans.variable} ${serif.variable}`}>{children}<Shortcuts /><Analytics /></body>
     </html>
   );
 }
